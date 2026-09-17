@@ -1,5 +1,5 @@
 /**
- * Zen Scratch Color - Application Core (Safari & PWA Optimized)
+ * Zen Scratch Color - Application Core (Memory Optimized + Eraser)
  */
 
 const state = {
@@ -36,6 +36,7 @@ const DOM = {
   toggleOutlines: document.getElementById('toggle-outlines'),
   modePaint: document.getElementById('mode-paint'),
   modeTap: document.getElementById('mode-tap'),
+  modeErase: document.getElementById('mode-erase'),
   paletteContainer: document.getElementById('palette-container'),
   brushSizeInput: document.getElementById('brush-size'),
   audioAmbient: document.getElementById('audio-ambient'),
@@ -63,11 +64,11 @@ function saveProjectsToStorage() {
   }
 }
 
-function compressImage(img, maxDimension = 800, quality = 0.75) {
+// Memory Fix: Reduced Max Dimension to 600
+function compressImage(img, maxDimension = 600, quality = 0.6) {
   const canvas = document.createElement('canvas');
-  // Fallback to strict dimensions if naturalWidth isn't ready
-  let width = img.naturalWidth || img.width || 800;
-  let height = img.naturalHeight || img.height || 800;
+  let width = img.naturalWidth || img.width || 600;
+  let height = img.naturalHeight || img.height || 600;
 
   if (width > maxDimension || height > maxDimension) {
     if (width > height) {
@@ -117,8 +118,9 @@ function processImageToProject(imgElement) {
         title: 'Canvas ' + (state.projects.length + 1),
         width: compressed.width,
         height: compressed.height,
-        colorImgUrl: tempCanvas.toDataURL('image/png'),
-        outlineImgUrl: outlineDataUrl,
+        // Memory Fix: Storing background strictly as JPEG
+        colorImgUrl: tempCanvas.toDataURL('image/jpeg', 0.8),
+        outlineImgUrl: outlineDataUrl, // Outlines must stay PNG for transparency
         scratchMaskUrl: null,
         palette: palette,
         progress: 0,
@@ -255,23 +257,22 @@ function setupCanvases(project) {
 }
 
 function setupEventListeners() {
-  // Safari FileReader Fix for local uploads
+  // Safari Native Image Decoder Fix
   DOM.uploadInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
     
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = async () => {
-        const project = await processImageToProject(img);
-        state.projects.unshift(project);
-        saveProjectsToStorage();
-        openStudio(project);
-      };
-      img.src = event.target.result;
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    
+    img.onload = async () => {
+      const project = await processImageToProject(img);
+      state.projects.unshift(project);
+      saveProjectsToStorage();
+      openStudio(project);
+      URL.revokeObjectURL(objectUrl);
     };
-    reader.readAsDataURL(file);
+    img.src = objectUrl;
   });
 
   // Browser Audio Unlocker
@@ -292,8 +293,11 @@ function setupEventListeners() {
   DOM.btnBackGallery.addEventListener('click', exitStudio);
   DOM.btnToggleSidebar.addEventListener('click', () => DOM.sidebar.classList.toggle('open'));
   DOM.btnCloseSidebar.addEventListener('click', () => DOM.sidebar.classList.remove('open'));
+  
   DOM.modePaint.addEventListener('click', () => setMode('paint'));
   DOM.modeTap.addEventListener('click', () => setMode('tap'));
+  DOM.modeErase.addEventListener('click', () => setMode('erase'));
+  
   DOM.toggleOutlines.addEventListener('change', (e) => {
     state.showOutlines = e.target.checked;
     DOM.layerOutline.style.display = state.showOutlines ? 'block' : 'none';
@@ -313,8 +317,20 @@ function setupEventListeners() {
   window.addEventListener('mouseup', handleMouseUp);
 }
 
+// Erase Logic Engine
 function scratchAt(canvasX, canvasY) {
   const ctx = DOM.layerScratch.getContext('2d');
+  
+  if (state.coloringMode === 'erase') {
+    ctx.globalCompositeOperation = 'source-over'; 
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(canvasX, canvasY, state.brushSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  // Scratch away mask
   ctx.globalCompositeOperation = 'destination-out'; 
   
   if (state.coloringMode === 'paint') {
@@ -452,6 +468,7 @@ function setMode(mode) {
   state.coloringMode = mode;
   DOM.modePaint.classList.toggle('active', mode === 'paint');
   DOM.modeTap.classList.toggle('active', mode === 'tap');
+  DOM.modeErase.classList.toggle('active', mode === 'erase');
 }
 
 function renderPalette(palette) {
