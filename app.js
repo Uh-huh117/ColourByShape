@@ -1,25 +1,22 @@
 /**
- * Zen Scratch Color - Application Core
+ * Zen Scratch Color - Application Core (Safari & PWA Optimized)
  */
 
-// --- Global App State ---
 const state = {
   projects: [],
   currentProject: null,
-  coloringMode: 'paint', // 'paint' or 'tap'
+  coloringMode: 'paint',
   selectedColorHex: null,
   brushSize: 30,
   showOutlines: true,
-  
-  // Transform State for Viewport (Pan, Zoom, Rotate)
   transform: { x: 0, y: 0, scale: 1, rotation: 0 },
   touches: [],
   initialTouchDist: 0,
   initialTouchAngle: 0,
   isPainting: false,
+  audioUnlocked: false
 };
 
-// --- DOM Cache ---
 const DOM = {
   viewGallery: document.getElementById('view-gallery'),
   viewStudio: document.getElementById('view-studio'),
@@ -47,14 +44,12 @@ const DOM = {
   toggleSFX: document.getElementById('toggle-sfx-audio')
 };
 
-// --- Initialization ---
 window.addEventListener('DOMContentLoaded', () => {
   loadProjectsFromStorage();
   setupEventListeners();
   renderGallery();
 });
 
-// --- LocalStorage & Image Compression ---
 function loadProjectsFromStorage() {
   const data = localStorage.getItem('zen_scratch_projects');
   state.projects = data ? JSON.parse(data) : [];
@@ -68,10 +63,11 @@ function saveProjectsToStorage() {
   }
 }
 
-// Compress uploaded images to avoid storage limit (~5MB)
 function compressImage(img, maxDimension = 800, quality = 0.75) {
   const canvas = document.createElement('canvas');
-  let { width, height } = img;
+  // Fallback to strict dimensions if naturalWidth isn't ready
+  let width = img.naturalWidth || img.width || 800;
+  let height = img.naturalHeight || img.height || 800;
 
   if (width > maxDimension || height > maxDimension) {
     if (width > height) {
@@ -94,14 +90,12 @@ function compressImage(img, maxDimension = 800, quality = 0.75) {
   };
 }
 
-// --- Image Processing Algorithm (Color Clustering & Outlines) ---
 function processImageToProject(imgElement) {
   const compressed = compressImage(imgElement);
-  
   const tempCanvas = document.createElement('canvas');
   tempCanvas.width = compressed.width;
   tempCanvas.height = compressed.height;
-  const ctx = tempCanvas.getContext('2d');
+  const ctx = tempCanvas.getContext('2d', { willReadFrequently: true });
   
   const tempImg = new Image();
   tempImg.src = compressed.dataUrl;
@@ -111,49 +105,39 @@ function processImageToProject(imgElement) {
       ctx.drawImage(tempImg, 0, 0);
       const imgData = ctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
       
-      // 1. Group Colors using simple Quantization (K-Means/Bucket simplification)
       const palette = extractColorPalette(imgData.data, 12);
-      
-      // 2. Create Quantized Color Canvas Data
       const quantizedData = ctx.createImageData(compressed.width, compressed.height);
       applyPaletteToImageData(imgData.data, quantizedData.data, palette);
       ctx.putImageData(quantizedData, 0, 0);
       
-      // 3. Extract Smooth Vector-like Outlines via Bilateral/Sobel edge detection
       const outlineDataUrl = generateSmoothOutlines(quantizedData, compressed.width, compressed.height);
 
-      const project = {
+      resolve({
         id: 'proj_' + Date.now(),
         title: 'Canvas ' + (state.projects.length + 1),
         width: compressed.width,
         height: compressed.height,
         colorImgUrl: tempCanvas.toDataURL('image/png'),
         outlineImgUrl: outlineDataUrl,
-        scratchMaskUrl: null, // Initial white canvas
+        scratchMaskUrl: null,
         palette: palette,
         progress: 0,
         createdAt: new Date().toISOString()
-      };
-
-      resolve(project);
+      });
     };
   });
 }
 
-// Simple color quantization into K dominant palette groups
 function extractColorPalette(data, maxColors = 12) {
   const colorMap = {};
-  for (let i = 0; i < data.length; i += 16) { // Sample every 4th pixel
+  for (let i = 0; i < data.length; i += 16) { 
     const r = Math.round(data[i] / 32) * 32;
     const g = Math.round(data[i+1] / 32) * 32;
     const b = Math.round(data[i+2] / 32) * 32;
     const hex = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
     colorMap[hex] = (colorMap[hex] || 0) + 1;
   }
-  
-  return Object.keys(colorMap)
-    .sort((a, b) => colorMap[b] - colorMap[a])
-    .slice(0, maxColors);
+  return Object.keys(colorMap).sort((a, b) => colorMap[b] - colorMap[a]).slice(0, maxColors);
 }
 
 function applyPaletteToImageData(src, dest, palette) {
@@ -177,7 +161,6 @@ function applyPaletteToImageData(src, dest, palette) {
   }
 }
 
-// Smooth Outline Generator (Edge detection with Gaussian smoothing effect)
 function generateSmoothOutlines(imgData, width, height) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -194,17 +177,16 @@ function generateSmoothOutlines(imgData, width, height) {
       const rightIdx = (y * width + (x + 1)) * 4;
       const bottomIdx = ((y + 1) * width + x) * 4;
 
-      // Color boundary detection
       const diffRight = Math.abs(src[idx] - src[rightIdx]) + Math.abs(src[idx+1] - src[rightIdx+1]) + Math.abs(src[idx+2] - src[rightIdx+2]);
       const diffBottom = Math.abs(src[idx] - src[bottomIdx]) + Math.abs(src[idx+1] - src[bottomIdx+1]) + Math.abs(src[idx+2] - src[bottomIdx+2]);
 
       if (diffRight > 30 || diffBottom > 30) {
-        dest[idx] = 30;      // R (Soft black)
-        dest[idx+1] = 30;    // G
-        dest[idx+2] = 35;    // B
-        dest[idx+3] = 220;   // Alpha
+        dest[idx] = 30;      
+        dest[idx+1] = 30;    
+        dest[idx+2] = 35;    
+        dest[idx+3] = 220;   
       } else {
-        dest[idx+3] = 0;     // Transparent
+        dest[idx+3] = 0;     
       }
     }
   }
@@ -222,7 +204,6 @@ function hexToRgb(hex) {
   } : { r: 0, g: 0, b: 0 };
 }
 
-// --- Studio Engine & Setup ---
 function openStudio(project) {
   state.currentProject = project;
   DOM.viewGallery.classList.add('view-hidden');
@@ -235,7 +216,9 @@ function openStudio(project) {
   renderPalette(project.palette);
   resetViewportTransform();
   
-  if (DOM.toggleAmbient.checked) DOM.audioAmbient.play();
+  if (DOM.toggleAmbient.checked && state.audioUnlocked) {
+    DOM.audioAmbient.play().catch(() => {});
+  }
 }
 
 function setupCanvases(project) {
@@ -250,15 +233,13 @@ function setupCanvases(project) {
   DOM.canvasWrapper.style.height = height + 'px';
 
   const ctxColor = DOM.layerColor.getContext('2d');
-  const ctxScratch = DOM.layerScratch.getContext('2d');
+  const ctxScratch = DOM.layerScratch.getContext('2d', { willReadFrequently: true });
   const ctxOutline = DOM.layerOutline.getContext('2d');
 
-  // Load Underlay Color Image
   const imgColor = new Image();
   imgColor.src = project.colorImgUrl;
   imgColor.onload = () => ctxColor.drawImage(imgColor, 0, 0);
 
-  // Load Scratch Mask (or initialize solid white canvas)
   if (project.scratchMaskUrl) {
     const imgScratch = new Image();
     imgScratch.src = project.scratchMaskUrl;
@@ -268,90 +249,93 @@ function setupCanvases(project) {
     ctxScratch.fillRect(0, 0, width, height);
   }
 
-  // Load Outline Overlay
   const imgOutline = new Image();
   imgOutline.src = project.outlineImgUrl;
   imgOutline.onload = () => ctxOutline.drawImage(imgOutline, 0, 0);
 }
 
-// --- Interaction & Gestures (1-finger draw, 2-finger pan/zoom/rotate) ---
 function setupEventListeners() {
-  // File Upload
-  DOM.uploadInput.addEventListener('change', async (e) => {
+  // Safari FileReader Fix for local uploads
+  DOM.uploadInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
     
-    const img = new Image();
-    img.src = URL.createObjectURL(file);
-    img.onload = async () => {
-      const project = await processImageToProject(img);
-      state.projects.unshift(project);
-      saveProjectsToStorage();
-      openStudio(project);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = async () => {
+        const project = await processImageToProject(img);
+        state.projects.unshift(project);
+        saveProjectsToStorage();
+        openStudio(project);
+      };
+      img.src = event.target.result;
     };
+    reader.readAsDataURL(file);
   });
 
-  // Navigation & UI Controls
+  // Browser Audio Unlocker
+  document.body.addEventListener('touchstart', () => {
+    if (!state.audioUnlocked) {
+      state.audioUnlocked = true;
+      if (DOM.toggleAmbient.checked) DOM.audioAmbient.play().catch(() => {});
+    }
+  }, { once: true });
+  
+  document.body.addEventListener('mousedown', () => {
+    if (!state.audioUnlocked) {
+      state.audioUnlocked = true;
+      if (DOM.toggleAmbient.checked) DOM.audioAmbient.play().catch(() => {});
+    }
+  }, { once: true });
+
   DOM.btnBackGallery.addEventListener('click', exitStudio);
   DOM.btnToggleSidebar.addEventListener('click', () => DOM.sidebar.classList.toggle('open'));
   DOM.btnCloseSidebar.addEventListener('click', () => DOM.sidebar.classList.remove('open'));
-
-  // Modes
   DOM.modePaint.addEventListener('click', () => setMode('paint'));
   DOM.modeTap.addEventListener('click', () => setMode('tap'));
-
-  // Outline Toggle
   DOM.toggleOutlines.addEventListener('change', (e) => {
     state.showOutlines = e.target.checked;
     DOM.layerOutline.style.display = state.showOutlines ? 'block' : 'none';
   });
-
-  // Brush Size
   DOM.brushSizeInput.addEventListener('input', (e) => state.brushSize = parseInt(e.target.value));
-
-  // Audio Toggles
   DOM.toggleAmbient.addEventListener('change', (e) => {
-    if (e.target.checked) DOM.audioAmbient.play();
+    if (e.target.checked) DOM.audioAmbient.play().catch(() => {});
     else DOM.audioAmbient.pause();
   });
 
-  // Multi-Touch Gesture Listeners
   const vp = DOM.viewport;
   vp.addEventListener('touchstart', handleTouchStart, { passive: false });
   vp.addEventListener('touchmove', handleTouchMove, { passive: false });
   vp.addEventListener('touchend', handleTouchEnd);
-
-  // Mouse fallback for desktop painting
   vp.addEventListener('mousedown', handleMouseDown);
   vp.addEventListener('mousemove', handleMouseMove);
   window.addEventListener('mouseup', handleMouseUp);
 }
 
-// --- Scratch Painting Core Mechanic ---
 function scratchAt(canvasX, canvasY) {
   const ctx = DOM.layerScratch.getContext('2d');
-  ctx.globalCompositeOperation = 'destination-out'; // Scratch away white paper
+  ctx.globalCompositeOperation = 'destination-out'; 
   
   if (state.coloringMode === 'paint') {
     ctx.beginPath();
     ctx.arc(canvasX, canvasY, state.brushSize / 2, 0, Math.PI * 2);
     ctx.fill();
 
-    if (DOM.toggleSFX.checked && DOM.audioPaint.paused) {
+    if (DOM.toggleSFX.checked && DOM.audioPaint.paused && state.audioUnlocked) {
       DOM.audioPaint.currentTime = 0;
       DOM.audioPaint.play().catch(() => {});
     }
   } else if (state.coloringMode === 'tap') {
-    // Tap to reveal larger region around tap point
     ctx.beginPath();
     ctx.arc(canvasX, canvasY, 60, 0, Math.PI * 2);
     ctx.fill();
   }
 }
 
-// Transform Screen Coordinates to Canvas Space
 function getCanvasCoords(clientX, clientY) {
   const rect = DOM.canvasWrapper.getBoundingClientRect();
+  if (!rect.width) return { x: 0, y: 0 };
   const scale = rect.width / state.currentProject.width;
   return {
     x: (clientX - rect.left) / scale,
@@ -359,18 +343,16 @@ function getCanvasCoords(clientX, clientY) {
   };
 }
 
-// --- Multi-touch Gesture Handler ---
 function handleTouchStart(e) {
+  if (e.target.closest('.sidebar') || e.target.closest('.app-header')) return;
   e.preventDefault();
   state.touches = Array.from(e.touches);
 
   if (state.touches.length === 1) {
-    // 1 Finger: Scratch / Reveal
     state.isPainting = true;
     const { x, y } = getCanvasCoords(state.touches[0].clientX, state.touches[0].clientY);
     scratchAt(x, y);
   } else if (state.touches.length === 2) {
-    // 2 Fingers: Start Pan, Pinch Zoom & Rotation
     state.isPainting = false;
     state.initialTouchDist = getTouchDistance(state.touches);
     state.initialTouchAngle = getTouchAngle(state.touches);
@@ -378,6 +360,7 @@ function handleTouchStart(e) {
 }
 
 function handleTouchMove(e) {
+  if (e.target.closest('.sidebar') || e.target.closest('.app-header')) return;
   e.preventDefault();
   const touches = Array.from(e.touches);
 
@@ -385,7 +368,6 @@ function handleTouchMove(e) {
     const { x, y } = getCanvasCoords(touches[0].clientX, touches[0].clientY);
     scratchAt(x, y);
   } else if (touches.length === 2) {
-    // Perform Pinch-Zoom, Rotation, and Pan Calculations
     const currentDist = getTouchDistance(touches);
     const currentAngle = getTouchAngle(touches);
     
@@ -408,9 +390,8 @@ function handleTouchEnd(e) {
   state.touches = Array.from(e.touches);
 }
 
-// Desktop Mouse Helpers
 function handleMouseDown(e) {
-  if (e.button !== 0) return;
+  if (e.button !== 0 || e.target.closest('.sidebar') || e.target.closest('.app-header')) return;
   state.isPainting = true;
   const { x, y } = getCanvasCoords(e.clientX, e.clientY);
   scratchAt(x, y);
@@ -429,19 +410,12 @@ function handleMouseUp() {
   }
 }
 
-// Touch Math
 function getTouchDistance(touches) {
-  return Math.hypot(
-    touches[0].clientX - touches[1].clientX,
-    touches[0].clientY - touches[1].clientY
-  );
+  return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
 }
 
 function getTouchAngle(touches) {
-  return Math.atan2(
-    touches[1].clientY - touches[0].clientY,
-    touches[1].clientX - touches[0].clientX
-  ) * (180 / Math.PI);
+  return Math.atan2(touches[1].clientY - touches[0].clientY, touches[1].clientX - touches[0].clientX) * (180 / Math.PI);
 }
 
 function updateViewportTransform() {
@@ -454,14 +428,12 @@ function resetViewportTransform() {
   updateViewportTransform();
 }
 
-// --- Auto-Save & Progress Calculation ---
 function autoSaveProgress() {
   if (!state.currentProject) return;
 
   const scratchCanvas = DOM.layerScratch;
   state.currentProject.scratchMaskUrl = scratchCanvas.toDataURL('image/png');
 
-  // Calculate reveal progress percentage
   const ctx = scratchCanvas.getContext('2d');
   const imgData = ctx.getImageData(0, 0, scratchCanvas.width, scratchCanvas.height).data;
   let revealedPixels = 0;
@@ -471,13 +443,11 @@ function autoSaveProgress() {
   
   state.currentProject.progress = Math.round((revealedPixels / (imgData.length / 16)) * 100);
 
-  // Update in array & save
   const index = state.projects.findIndex(p => p.id === state.currentProject.id);
   if (index !== -1) state.projects[index] = state.currentProject;
   saveProjectsToStorage();
 }
 
-// --- UI / Sidebar / Mode Management ---
 function setMode(mode) {
   state.coloringMode = mode;
   DOM.modePaint.classList.toggle('active', mode === 'paint');
