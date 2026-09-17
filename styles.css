@@ -175,19 +175,14 @@ body {
   touch-action: none;
 }
 
-.canvas-wrapper {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform-origin: center center;
-  box-shadow: 0 0 30px rgba(0,0,0,0.8);
-}
-
 .canvas-wrapper canvas {
   position: absolute;
   top: 0;
   left: 0;
   border-radius: 4px;
+  /* Forces Safari to use GPU rendering, preventing the black screen crash */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 
 /* Sliding Sidebar */
