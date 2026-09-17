@@ -1,0 +1,139 @@
+:root {
+    --bg-color: #f7f9fc;
+    --sidebar-bg: #ffffff;
+    --primary: #4a90e2;
+    --text-main: #333333;
+    --border: #e1e4e8;
+}
+
+body, html {
+    margin: 0; padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    height: 100vh;
+}
+
+header {
+    text-align: center;
+    padding: 2rem;
+    background: var(--sidebar-bg);
+    border-bottom: 1px solid var(--border);
+}
+
+.upload-btn-wrapper {
+    position: relative;
+    overflow: hidden;
+    display: inline-block;
+}
+
+.upload-btn-wrapper input[type=file] {
+    font-size: 100px;
+    position: absolute;
+    left: 0; top: 0; opacity: 0;
+    cursor: pointer;
+}
+
+.btn {
+    border: none;
+    background-color: var(--primary);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.btn.outline-btn {
+    background-color: transparent;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+}
+
+/* Gallery */
+.gallery-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+    padding: 2rem;
+}
+
+.gallery-item {
+    background: white;
+    border-radius: 12px;
+    padding: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.gallery-item:hover { transform: translateY(-5px); }
+.gallery-item img { width: 100%; border-radius: 8px; }
+
+/* Editor Layout */
+.app-layout {
+    display: flex;
+    height: 100vh;
+}
+
+.canvas-container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+}
+
+canvas {
+    max-width: 90%;
+    max-height: 90%;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    background: white;
+}
+
+.overlay-canvas {
+    position: absolute;
+    pointer-events: none; /* Let clicks pass through to coloring canvas */
+}
+
+.sidebar {
+    width: 300px;
+    background: var(--sidebar-bg);
+    border-left: 1px solid var(--border);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+}
+
+.control-group {
+    background: var(--bg-color);
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.mode-toggle {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.palette-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.color-swatch {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+}
+.color-swatch.active { border-color: var(--text-main); }
