@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zen Color Custom - Workspace</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Audio Placeholders -->
+    <audio id="ambientAudio" src="assets/ambient.mp3" loop></audio>
+    <audio id="brushAudio" src="assets/brush.mp3"></audio>
+
+    <div class="app-layout">
+        <main class="canvas-container">
+            <canvas id="coloringCanvas"></canvas>
+            <canvas id="outlineCanvas" class="overlay-canvas"></canvas>
+        </main>
+
+        <aside class="sidebar">
+            <button id="backBtn" class="btn outline-btn">← Back to Gallery</button>
+            
+            <div class="control-group">
+                <h3>Settings</h3>
+                <label>
+                    <input type="checkbox" id="toggleOutline" checked> 
+                    Show Black Outlines
+                </label>
+                <div class="mode-toggle">
+                    <label>
+                        <input type="radio" name="colorMode" value="tap" checked> Tap to Color
+                    </label>
+                    <label>
+                        <input type="radio" name="colorMode" value="paint"> Paint to Color
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Color Palette</h3>
+                <div id="paletteContainer" class="palette-grid">
+                    <!-- Colors generated via JS -->
+                </div>
+            </div>
+
+            <button id="saveBtn" class="btn">Force Save Progress</button>
+        </aside>
+    </div>
+
+    <script src="js/editor.js"></script>
+</body>
+</html>
