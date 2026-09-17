@@ -12,8 +12,10 @@ body, html {
     background-color: var(--bg-color);
     color: var(--text-main);
     height: 100vh;
+    overflow: hidden; /* Prevent scrolling during gestures */
 }
 
+/* Header & Gallery */
 header {
     text-align: center;
     padding: 2rem;
@@ -52,12 +54,13 @@ header {
     border: 1px solid var(--primary);
 }
 
-/* Gallery */
 .gallery-container {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 20px;
     padding: 2rem;
+    max-height: calc(100vh - 150px);
+    overflow-y: auto;
 }
 
 .gallery-item {
@@ -72,34 +75,51 @@ header {
 .gallery-item:hover { transform: translateY(-5px); }
 .gallery-item img { width: 100%; border-radius: 8px; }
 
-/* Editor Layout */
+/* Workspace & Viewport Layout */
 .app-layout {
     display: flex;
     height: 100vh;
-}
-
-.canvas-container {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
     position: relative;
     overflow: hidden;
 }
 
+.canvas-viewport {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    background-color: #eef2f5;
+    overflow: hidden;
+    touch-action: none; /* Crucial for custom touch gestures */
+}
+
+.transform-layer {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform-origin: center center;
+    will-change: transform;
+}
+
 canvas {
-    max-width: 90%;
-    max-height: 90%;
-    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
     background: white;
 }
 
 .overlay-canvas {
-    position: absolute;
-    pointer-events: none; /* Let clicks pass through to coloring canvas */
+    pointer-events: none; /* Mouse clicks pass through to color canvas */
 }
 
+/* Sliding Sidebar */
 .sidebar {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
     width: 300px;
     background: var(--sidebar-bg);
     border-left: 1px solid var(--border);
@@ -108,6 +128,47 @@ canvas {
     flex-direction: column;
     gap: 20px;
     overflow-y: auto;
+    z-index: 100;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: -5px 0 15px rgba(0,0,0,0.05);
+}
+
+.sidebar.collapsed {
+    transform: translateX(100%);
+}
+
+.sidebar-toggle {
+    position: absolute;
+    left: -42px;
+    top: 20px;
+    width: 42px;
+    height: 42px;
+    background: var(--sidebar-bg);
+    border: 1px solid var(--border);
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+    font-size: 22px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: -3px 0 8px rgba(0,0,0,0.05);
+    color: var(--text-main);
+}
+
+/* Controls UI */
+.floating-btn {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    z-index: 90;
+    padding: 10px 16px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 30px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    cursor: pointer;
+    font-weight: 600;
 }
 
 .control-group {
@@ -116,11 +177,18 @@ canvas {
     border-radius: 8px;
 }
 
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
 .mode-toggle {
     margin-top: 10px;
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 8px;
 }
 
 .palette-grid {
@@ -134,6 +202,11 @@ canvas {
     aspect-ratio: 1;
     border-radius: 50%;
     cursor: pointer;
-    border: 2px solid transparent;
+    border: 3px solid transparent;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
-.color-swatch.active { border-color: var(--text-main); }
+
+.color-swatch.active { 
+    border-color: var(--text-main); 
+    transform: scale(1.1);
+}
