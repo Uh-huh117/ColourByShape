@@ -1,10 +1,17 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Canvases
     const coloringCanvas = document.getElementById('coloringCanvas');
     const outlineCanvas = document.getElementById('outlineCanvas');
+    const viewport = document.getElementById('canvasViewport');
+    const transformLayer = document.getElementById('transformLayer');
+    
     const ctx = coloringCanvas.getContext('2d', { willReadFrequently: true });
     const outlineCtx = outlineCanvas.getContext('2d', { willReadFrequently: true });
     
     // UI Elements
+    const sidebar = document.getElementById('sidebar');
+    const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
+    const reorientBtn = document.getElementById('reorientBtn');
     const outlineToggle = document.getElementById('toggleOutline');
     const paletteContainer = document.getElementById('paletteContainer');
     const backBtn = document.getElementById('backBtn');
@@ -14,85 +21,103 @@ document.addEventListener('DOMContentLoaded', () => {
     const ambientAudio = document.getElementById('ambientAudio');
     const brushAudio = document.getElementById('brushAudio');
 
-    // State variables
+    // State Variables
     let currentProjectId = localStorage.getItem('currentProject');
     let projectData = JSON.parse(localStorage.getItem(currentProjectId));
     let activeColor = [0, 0, 0, 255]; 
     let isPainting = false;
-    let colorMode = 'tap'; // 'tap' or 'paint'
+    let colorMode = 'tap';
     let imageWidth, imageHeight;
 
-    // Load Project
+    // Viewport Transform State (Zoom, Pan, Rotate)
+    let transform = { scale: 1, tx: 0, ty: 0, rotation: 0 };
+    let gestureState = { startDist: 0, startAngle: 0, startScale: 1, startRotation: 0, startTx: 0, startTy: 0, center: null };
+
     if (!projectData) {
         window.location.href = 'index.html';
         return;
     }
 
+    // Load & Initialize Image
     const img = new Image();
     img.src = projectData.original;
     img.onload = () => {
         imageWidth = coloringCanvas.width = outlineCanvas.width = img.width;
         imageHeight = coloringCanvas.height = outlineCanvas.height = img.height;
         
-        // If there's saved progress, load it, otherwise process the original
         if (projectData.progress) {
             const progImg = new Image();
             progImg.src = projectData.progress;
             progImg.onload = () => {
                 ctx.drawImage(progImg, 0, 0);
-                extractPaletteAndOutlines(img); // Still need original for outlines/palette
-            }
+                extractPaletteAndOutlines(img);
+            };
         } else {
             ctx.drawImage(img, 0, 0);
             processImageForColoring();
         }
         
-        // Start ambient music on first interaction
-        document.body.addEventListener('click', () => {
-            if (ambientAudio.paused) ambientAudio.play().catch(e => console.log("Audio play blocked by browser."));
+        updateTransform();
+
+        // Audio autoplay unlock
+        document.body.addEventListener('pointerdown', () => {
+            if (ambientAudio.paused) ambientAudio.play().catch(() => {});
         }, { once: true });
     };
 
-    // --- Core Algorithm: Group Colors & Create Outlines ---
+    // --- Sidebar Toggle ---
+    toggleSidebarBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('collapsed');
+        toggleSidebarBtn.textContent = sidebar.classList.contains('collapsed') ? '›' : '‹';
+    });
+
+    // --- Core Smoothing & Outline Algorithm ---
     function processImageForColoring() {
-        const imageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
+        // Step 1: Create a pre-smoothed version on a temporary canvas
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = imageWidth; tempCanvas.height = imageHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+
+        // Pre-blur original image to smooth out noise and harsh sharp transitions
+        tempCtx.filter = 'blur(3px) contrast(130%)';
+        tempCtx.drawImage(img, 0, 0);
+
+        const imageData = tempCtx.getImageData(0, 0, imageWidth, imageHeight);
         const data = imageData.data;
         let paletteSet = new Set();
 
-        // 1. Posterize (Quantize colors to group aesthetically)
-        const levels = 4; // Adjust for more/less shapes
+        // Quantize colors for aesthetic palette grouping
+        const levels = 5; 
         const factor = 255 / (levels - 1);
         
         for (let i = 0; i < data.length; i += 4) {
-            data[i]     = Math.round(data[i] / factor) * factor;   // R
-            data[i + 1] = Math.round(data[i+1] / factor) * factor; // G
-            data[i + 2] = Math.round(data[i+2] / factor) * factor; // B
-            
-            const colorStr = `${data[i]},${data[i+1]},${data[i+2]}`;
-            paletteSet.add(colorStr);
+            data[i]     = Math.round(data[i] / factor) * factor;
+            data[i + 1] = Math.round(data[i+1] / factor) * factor;
+            data[i + 2] = Math.round(data[i+2] / factor) * factor;
+            paletteSet.add(`${data[i]},${data[i+1]},${data[i+2]}`);
         }
         
-        // Make the initial canvas blank for the user to color in (or grayscale)
-        ctx.fillStyle = '#f0f0f0';
+        // Prepare blank canvas for user
+        ctx.fillStyle = '#f8f9fa';
         ctx.fillRect(0, 0, imageWidth, imageHeight);
 
         generatePaletteUI(Array.from(paletteSet));
-        generateOutlines(data);
+        generateSmoothOutlines(tempCanvas);
         saveProgress();
     }
 
-    // Helper for loading progress to extract outlines without overwriting canvas
     function extractPaletteAndOutlines(sourceImg) {
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = imageWidth; tempCanvas.height = imageHeight;
         const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.filter = 'blur(3px) contrast(130%)';
         tempCtx.drawImage(sourceImg, 0, 0);
         
         const imageData = tempCtx.getImageData(0, 0, imageWidth, imageHeight);
         const data = imageData.data;
         let paletteSet = new Set();
         
-        const levels = 4; const factor = 255 / (levels - 1);
+        const levels = 5; const factor = 255 / (levels - 1);
         for (let i = 0; i < data.length; i += 4) {
             data[i] = Math.round(data[i]/factor)*factor;
             data[i+1] = Math.round(data[i+1]/factor)*factor;
@@ -100,33 +125,47 @@ document.addEventListener('DOMContentLoaded', () => {
             paletteSet.add(`${data[i]},${data[i+1]},${data[i+2]}`);
         }
         generatePaletteUI(Array.from(paletteSet));
-        generateOutlines(data);
+        generateSmoothOutlines(tempCanvas);
     }
 
-    // 2. Edge Detection (Black outlines based on color grouping boundaries)
-    function generateOutlines(quantizedData) {
+    // Smooth Sobel Edge Detector
+    function generateSmoothOutlines(sourceCanvas) {
+        const tempCtx = sourceCanvas.getContext('2d');
+        const imgData = tempCtx.getImageData(0, 0, imageWidth, imageHeight);
+        const data = imgData.data;
+        
         const outlineData = outlineCtx.createImageData(imageWidth, imageHeight);
         const od = outlineData.data;
 
-        for (let y = 0; y < imageHeight; y++) {
-            for (let x = 0; x < imageWidth; x++) {
+        // Sobel kernels for smooth line extraction
+        for (let y = 1; y < imageHeight - 1; y++) {
+            for (let x = 1; x < imageWidth - 1; x++) {
                 const idx = (y * imageWidth + x) * 4;
-                let isEdge = false;
 
-                if (x < imageWidth - 1 && y < imageHeight - 1) {
-                    const rightIdx = (y * imageWidth + (x + 1)) * 4;
-                    const bottomIdx = ((y + 1) * imageWidth + x) * 4;
+                let gx = 0, gy = 0;
 
-                    // Compare with right and bottom pixel
-                    if (quantizedData[idx] !== quantizedData[rightIdx] || 
-                        quantizedData[idx] !== quantizedData[bottomIdx]) {
-                        isEdge = true;
+                for (let ky = -1; ky <= 1; ky++) {
+                    for (let kx = -1; kx <= 1; kx++) {
+                        const nIdx = ((y + ky) * imageWidth + (x + kx)) * 4;
+                        // Luminance gradient
+                        const lum = data[nIdx] * 0.299 + data[nIdx+1] * 0.587 + data[nIdx+2] * 0.114;
+
+                        const wx = (kx === 0) ? 0 : (kx * (ky === 0 ? 2 : 1));
+                        const wy = (ky === 0) ? 0 : (ky * (kx === 0 ? 2 : 1));
+
+                        gx += lum * wx;
+                        gy += lum * wy;
                     }
                 }
 
-                if (isEdge) {
-                    od[idx] = od[idx+1] = od[idx+2] = 0; // Black
-                    od[idx+3] = 255; // Alpha
+                const magnitude = Math.sqrt(gx * gx + gy * gy);
+
+                if (magnitude > 70) {
+                    od[idx] = 20;     // Soft charcoal black
+                    od[idx+1] = 20;
+                    od[idx+2] = 20;
+                    // Anti-aliased opacity based on magnitude
+                    od[idx+3] = Math.min(255, Math.floor(magnitude * 1.8)); 
                 } else {
                     od[idx+3] = 0; // Transparent
                 }
@@ -135,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
         outlineCtx.putImageData(outlineData, 0, 0);
     }
 
-    // --- UI Interactions ---
+    // --- UI Helpers & Palette ---
     function generatePaletteUI(colors) {
         paletteContainer.innerHTML = '';
         colors.forEach((cStr, index) => {
@@ -163,43 +202,153 @@ document.addEventListener('DOMContentLoaded', () => {
         radio.addEventListener('change', (e) => { colorMode = e.target.value; });
     });
 
-    backBtn.addEventListener('click', () => {
-        saveProgress();
-        window.location.href = 'index.html';
-    });
-    
+    backBtn.addEventListener('click', () => { saveProgress(); window.location.href = 'index.html'; });
     saveBtn.addEventListener('click', saveProgress);
 
-    // --- Auto-Save & Sound ---
     function saveProgress() {
         projectData.progress = coloringCanvas.toDataURL('image/png');
         localStorage.setItem(currentProjectId, JSON.stringify(projectData));
     }
-
-    // Auto-save every 30 seconds
     setInterval(saveProgress, 30000);
 
     function playPaintSound() {
-        if (!brushAudio.paused) {
-            brushAudio.currentTime = 0;
-        } else {
-            brushAudio.play().catch(e => console.log("Audio blocked"));
-        }
+        if (!brushAudio.paused) brushAudio.currentTime = 0;
+        else brushAudio.play().catch(() => {});
     }
 
-    // --- Interaction / Coloring Logic ---
-    function getCanvasCoords(e) {
-        const rect = coloringCanvas.getBoundingClientRect();
-        const scaleX = coloringCanvas.width / rect.width;
-        const scaleY = coloringCanvas.height / rect.height;
+    // --- Viewport Transform Math (Pan, Zoom, Rotate) ---
+    function updateTransform() {
+        transformLayer.style.transform = `translate3d(${transform.tx}px, ${transform.ty}px, 0px) scale(${transform.scale}) rotate(${transform.rotation}deg)`;
+    }
+
+    reorientBtn.addEventListener('click', () => {
+        transform = { scale: 1, tx: 0, ty: 0, rotation: 0 };
+        updateTransform();
+    });
+
+    // Screen-to-Canvas Coordinate Matrix Inversion
+    function screenToCanvasCoords(screenX, screenY) {
+        const rect = viewport.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2 + transform.tx;
+        const cy = rect.top + rect.height / 2 + transform.ty;
+
+        let dx = screenX - cx;
+        let dy = screenY - cy;
+
+        // Reverse rotation
+        const rad = -transform.rotation * Math.PI / 180;
+        const rx = dx * Math.cos(rad) - dy * Math.sin(rad);
+        const ry = dx * Math.sin(rad) + dy * Math.cos(rad);
+
+        // Reverse scale
+        const unscaledX = rx / transform.scale;
+        const unscaledY = ry / transform.scale;
+
+        // Offset to canvas pixel bounds
         return {
-            x: Math.floor((e.clientX - rect.left) * scaleX),
-            y: Math.floor((e.clientY - rect.top) * scaleY)
+            x: Math.floor(unscaledX + imageWidth / 2),
+            y: Math.floor(unscaledY + imageHeight / 2)
         };
     }
 
-    outlineCanvas.addEventListener('mousedown', (e) => {
-        const {x, y} = getCanvasCoords(e);
+    // --- Touch Gestures (2-Finger Zoom, Pan, Rotate) & Paint Handlers ---
+    function getTouchDistance(t1, t2) {
+        return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+    }
+
+    function getTouchAngle(t1, t2) {
+        return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX) * 180 / Math.PI;
+    }
+
+    function getTouchCenter(t1, t2) {
+        return { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+    }
+
+    viewport.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+            // 2 Finger gesture start
+            isPainting = false;
+            const t1 = e.touches[0], t2 = e.touches[1];
+            gestureState.startDist = getTouchDistance(t1, t2);
+            gestureState.startAngle = getTouchAngle(t1, t2);
+            gestureState.startScale = transform.scale;
+            gestureState.startRotation = transform.rotation;
+            gestureState.startTx = transform.tx;
+            gestureState.startTy = transform.ty;
+            gestureState.center = getTouchCenter(t1, t2);
+        } else if (e.touches.length === 1) {
+            // 1 Finger interaction (paint/fill)
+            const coords = screenToCanvasCoords(e.touches[0].clientX, e.touches[0].clientY);
+            handleCanvasPointerStart(coords.x, coords.y);
+        }
+    }, { passive: false });
+
+    viewport.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2) {
+            e.preventDefault(); // Stop native viewport scrolling
+            const t1 = e.touches[0], t2 = e.touches[1];
+            
+            // Zoom
+            const dist = getTouchDistance(t1, t2);
+            const scaleFactor = dist / gestureState.startDist;
+            transform.scale = Math.max(0.2, Math.min(6, gestureState.startScale * scaleFactor));
+
+            // Rotation / Reorient
+            const angle = getTouchAngle(t1, t2);
+            transform.rotation = gestureState.startRotation + (angle - gestureState.startAngle);
+
+            // Pan / Drag
+            const currentCenter = getTouchCenter(t1, t2);
+            transform.tx = gestureState.startTx + (currentCenter.x - gestureState.center.x);
+            transform.ty = gestureState.startTy + (currentCenter.y - gestureState.center.y);
+
+            updateTransform();
+        } else if (e.touches.length === 1 && isPainting) {
+            const coords = screenToCanvasCoords(e.touches[0].clientX, e.touches[0].clientY);
+            paint(coords.x, coords.y);
+        }
+    }, { passive: false });
+
+    viewport.addEventListener('touchend', (e) => {
+        if (e.touches.length < 2 && isPainting) {
+            isPainting = false;
+            saveProgress();
+        }
+    });
+
+    // --- Mouse Controls (Desktop Fallback) ---
+    viewport.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+        transform.scale = Math.max(0.2, Math.min(6, transform.scale * zoomFactor));
+        updateTransform();
+    }, { passive: false });
+
+    viewport.addEventListener('mousedown', (e) => {
+        if (e.button === 0) { // Left click
+            const coords = screenToCanvasCoords(e.clientX, e.clientY);
+            handleCanvasPointerStart(coords.x, coords.y);
+        }
+    });
+
+    viewport.addEventListener('mousemove', (e) => {
+        if (isPainting && colorMode === 'paint') {
+            const coords = screenToCanvasCoords(e.clientX, e.clientY);
+            paint(coords.x, coords.y);
+        }
+    });
+
+    window.addEventListener('mouseup', () => {
+        if (isPainting) {
+            isPainting = false;
+            saveProgress();
+        }
+    });
+
+    // Handle Start Interaction
+    function handleCanvasPointerStart(x, y) {
+        if (x < 0 || x >= imageWidth || y < 0 || y >= imageHeight) return;
+        
         if (colorMode === 'tap') {
             floodFill(x, y, activeColor);
             playPaintSound();
@@ -209,37 +358,22 @@ document.addEventListener('DOMContentLoaded', () => {
             paint(x, y);
             playPaintSound();
         }
-    });
+    }
 
-    outlineCanvas.addEventListener('mousemove', (e) => {
-        if (!isPainting || colorMode !== 'paint') return;
-        const {x, y} = getCanvasCoords(e);
-        paint(x, y);
-    });
-
-    outlineCanvas.addEventListener('mouseup', () => { 
-        isPainting = false; 
-        if (colorMode === 'paint') saveProgress();
-    });
-    
-    outlineCanvas.addEventListener('mouseleave', () => { isPainting = false; });
-
-    // Paint Mode: Manual Brushing
+    // --- Painting & Flood Fill Tools ---
     function paint(x, y) {
         ctx.fillStyle = `rgb(${activeColor[0]}, ${activeColor[1]}, ${activeColor[2]})`;
         ctx.beginPath();
-        ctx.arc(x, y, 15, 0, Math.PI * 2);
+        ctx.arc(x, y, 12, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    // Tap Mode: Flood Fill Algorithm
     function floodFill(startX, startY, fillColor) {
         const imgData = ctx.getImageData(0, 0, imageWidth, imageHeight);
         const data = imgData.data;
         const startPos = (startY * imageWidth + startX) * 4;
         const startColor = [data[startPos], data[startPos+1], data[startPos+2], data[startPos+3]];
         
-        // If clicking on same color, do nothing
         if (startColor[0] === fillColor[0] && startColor[1] === fillColor[1] && 
             startColor[2] === fillColor[2] && startColor[3] === fillColor[3]) return;
 
@@ -263,7 +397,6 @@ document.addEventListener('DOMContentLoaded', () => {
             let y = newPos[1];
             let pos = (y * imageWidth + x) * 4;
 
-            // Go up as long as color matches
             while (y-- >= 0 && matchStartColor(pos)) { pos -= imageWidth * 4; }
             pos += imageWidth * 4;
             y++;
