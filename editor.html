@@ -7,9 +7,15 @@
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-    <!-- Audio Placeholders -->
-    <audio id="ambientAudio" src="assets/ambient.mp3" loop></audio>
-    <audio id="brushAudio" src="assets/brush.mp3"></audio>
+    <!-- Audio Placeholders: Prefers WebM (Opus) for gapless loops, falls back to MP3 -->
+    <audio id="ambientAudio" loop>
+        <source src="assets/ambient.webm" type="audio/webm">
+        <source src="assets/ambient.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="brushAudio">
+        <source src="assets/brush.webm" type="audio/webm">
+        <source src="assets/brush.mp3" type="audio/mpeg">
+    </audio>
 
     <div class="app-layout">
         <main class="canvas-container">
