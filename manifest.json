@@ -1,0 +1,11 @@
+{
+  "name": "Scratchlight Colour Studio",
+  "short_name": "Scratchlight",
+  "description": "Turn your own pictures into scratch-away colouring pages.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f0e8",
+  "theme_color": "#f5f0e8",
+  "icons": []
+}

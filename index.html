@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="theme-color" content="#f5f0e8">
+  <title>Scratchlight — Colour Studio</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <button id="homeBtn" class="brand" aria-label="Back to gallery"><span class="brand-mark">✦</span><span>scratchlight</span></button>
+    <div class="top-actions">
+      <span id="saveStatus" class="save-status">Ready</span>
+      <button id="galleryBtn" class="quiet-btn">Gallery</button>
+      <button id="sidebarToggle" class="round-btn" aria-label="Toggle sidebar">☷</button>
+    </div>
+  </header>
+
+  <main id="galleryView" class="gallery-view">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">YOUR LITTLE COLOURING CORNER</p>
+        <h1>Make room<br><em>for colour.</em></h1>
+        <p class="hero-copy">Bring a picture. Find its colours. Scratch the quiet white away.</p>
+      </div>
+      <label class="upload-card" for="imageUpload">
+        <span class="upload-icon">＋</span><strong>Add a picture</strong><small>PNG, JPG, WEBP · processed on this device</small>
+        <input id="imageUpload" type="file" accept="image/*">
+      </label>
+    </section>
+    <section class="gallery-section">
+      <div class="section-head"><div><p class="eyebrow">YOUR COLLECTION</p><h2>All works <span id="workCount">0</span></h2></div>
+        <div class="filters"><button class="filter active" data-filter="all">All</button><button class="filter" data-filter="progress">In progress</button><button class="filter" data-filter="complete">Complete</button></div>
+      </div>
+      <div id="workGrid" class="work-grid"></div>
+      <div id="emptyState" class="empty-state"><div class="empty-art">✧</div><h3>Your gallery is waiting</h3><p>Upload a picture to turn it into a special page.</p><label class="primary-btn" for="imageUpload">Choose a picture</label></div>
+    </section>
+  </main>
+
+  <main id="studioView" class="studio-view hidden">
+    <div class="workspace">
+      <div class="canvas-wrap" id="canvasWrap">
+        <div class="canvas-stage" id="canvasStage">
+          <canvas id="artCanvas"></canvas>
+          <canvas id="scratchCanvas"></canvas>
+          <canvas id="outlineCanvas"></canvas>
+          <canvas id="paintCanvas"></canvas>
+        </div>
+        <div id="welcomeHint" class="canvas-hint">Choose a colour, then tap a shape or paint it in.</div>
+        <button id="fitBtn" class="fit-btn" title="Fit artwork">⤢</button>
+      </div>
+      <aside id="sidebar" class="sidebar">
+        <div class="sidebar-head"><div><p class="eyebrow">YOUR PAGE</p><h2 id="artTitle">Untitled</h2></div><button id="closeSidebar" class="round-btn" aria-label="Close sidebar">×</button></div>
+        <div class="progress-row"><span>Revealed</span><strong id="progressLabel">0%</strong></div>
+        <div class="progress-track"><div id="progressBar"></div></div>
+        <div class="control-block">
+          <label class="control-label">Colouring style</label>
+          <div class="segmented"><button data-mode="tap" class="mode-btn active">Tap to colour</button><button data-mode="paint" class="mode-btn">Paint</button></div>
+          <p id="modeHelp" class="microcopy">Tap a shape to reveal its colour.</p>
+        </div>
+        <div class="control-block">
+          <div class="setting-line"><label class="control-label" for="outlineToggle">Black outlines</label><input id="outlineToggle" type="checkbox" checked></div>
+          <div class="setting-line"><label class="control-label" for="musicToggle">Ambient music</label><input id="musicToggle" type="checkbox"></div>
+          <p class="microcopy">Add your own looped MP3 at <code>assets/audio/ambient.mp3</code>.</p>
+        </div>
+        <div class="control-block">
+          <label class="control-label" for="detailRange">Shape detail <span id="detailValue">Balanced</span></label>
+          <input id="detailRange" type="range" min="1" max="5" value="3">
+          <p class="microcopy">More detail creates smaller, more numerous colour regions.</p>
+        </div>
+        <div class="palette-head"><div><label class="control-label">Like-enough colours</label><span id="paletteCount" class="microcopy"></span></div><button id="clearColour" class="text-btn">Clear</button></div>
+        <div id="palette" class="palette"></div>
+        <div class="sidebar-foot"><button id="finishBtn" class="primary-btn full">Back to gallery</button><button id="deleteBtn" class="text-btn danger">Delete this work</button></div>
+      </aside>
+    </div>
+  </main>
+
+  <audio id="ambientAudio" src="assets/audio/ambient.mp3" loop preload="none"></audio>
+  <audio id="paintAudio" src="assets/audio/paint.mp3" preload="none"></audio>
+  <script src="app.js"></script>
+</body>
+</html>
