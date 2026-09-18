@@ -1,0 +1,11 @@
+{
+  "name": "Special Pages Colouring Studio",
+  "short_name": "Special Pages",
+  "description": "Turn your own pictures into scratch-to-reveal colouring pages.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#202522",
+  "theme_color": "#202522",
+  "icons": []
+}
