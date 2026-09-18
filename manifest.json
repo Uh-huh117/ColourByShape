@@ -1,20 +1,11 @@
 {
-  "name": "Zen Scratch Color",
-  "short_name": "Zen Scratch",
-  "start_url": "./index.html",
+  "name": "Special Pages Colouring Studio",
+  "short_name": "Special Pages",
+  "description": "Turn your own pictures into scratch-to-reveal colouring pages.",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#0f141c",
-  "theme_color": "#1a202c",
-  "icons": [
-    {
-      "src": "assets/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "assets/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
-  ]
+  "background_color": "#202522",
+  "theme_color": "#202522",
+  "icons": []
 }
